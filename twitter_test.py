@@ -2,18 +2,11 @@ import pytest
 
 from twitter import Twitter
 
-#opcjonaly sposób wywołania funckji kończącej
-# @pytest.fixture
-# def twitter(request):
-#     twitter = Twitter()
-#     def fin():
-#         twitter.delete()
-#     request.addfinalizer(fin)
-#     return twitter
 
-@pytest.fixture
-def twitter():
-    twitter = Twitter()
+#można wywołąć fixture dwa razy nan
+@pytest.fixture(params=[None, "test.txt"])
+def twitter(request):
+    twitter = Twitter(backend=request.param)
     yield twitter
     twitter.delete()
 
@@ -30,6 +23,7 @@ def test_twitter_single_message(twitter):
 def test_twitter_long_message(twitter):
     with pytest.raises(Exception):
         twitter.tweet("test"*41)
+    assert twitter.tweets == []
 
 
 @pytest.mark.parametrize("expected, message", (
