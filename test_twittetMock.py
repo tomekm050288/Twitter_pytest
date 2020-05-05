@@ -1,13 +1,8 @@
-import pytest
+from unittest.mock import patch, Mock, MagicMock
 import requests
+import pytest
+
 from twitter import Twitter
-
-
-# nieporządana uruchamia się czy jest potrzebna czy nie przed kazdym testem
-# @pytest.fixture(autouse=True)
-# def prepare_backend_file():
-#     with open('test.txt', "w"):
-#         pass
 
 
 class ResponseGetMock(object):
@@ -15,7 +10,6 @@ class ResponseGetMock(object):
         return {'avatar_url': 'test'}
 
 
-# fixture to wyłączania zapytań z request
 @pytest.fixture(autouse=True)
 def no_request(monkeypatch):
     monkeypatch.delattr('requests.sessions.Session.request')
@@ -33,8 +27,6 @@ def username(request):
     return request.param
 
 
-# można wywołąć fixture dwa razy na jednej klasie
-# parametr name pozwala nadać inną nazwę funckji fixture niż zwracany parametr
 @pytest.fixture(params=['list', 'backend'], name='twitter')
 def fixture_twitter(backend, username, request, monkeypatch):
     if request.param == 'list':
@@ -42,24 +34,17 @@ def fixture_twitter(backend, username, request, monkeypatch):
     elif request.param == 'backend':
         twitter = Twitter(backend=backend, username=username)
 
-    # def monkey_return():
-    #     return 'test'
-
-    # monkeypatch.setattr(twitter, 'get_user_avatar', monkey_return)
-    # return twitter
-
-    def monkey_return(url):
-        return ResponseGetMock()
-
-    monkeypatch.setattr(requests, 'get', monkey_return)
     return twitter
 
 
 def test_twitter_initialization(twitter):
     assert twitter
 
-
-def test_twitter_single_message(twitter):
+# w dekoratorze patch nie można użyć obikktu twitter z fixture
+@patch.object(Twitter, 'get_user_avatar', return_value='test')
+def test_twitter_single_message(avatar_mock, twitter):
+    # with patch('twitter.Twitter.get_user_avatar', return_value='test'):
+    # with patch.object(twitter, 'get_user_avatar', return_value='test'):
     twitter.tweet("Test message")
     assert twitter.tweet_messages == ["Test message"]
 
@@ -91,9 +76,48 @@ def test_tweet_with_hashtags(expected, message, twitter):
     assert twitter.find_hashtags(message) == expected
 
 
-def test_tweet_with_username(twitter):
+# należy dodać argument avatar_mock do funkcji testowej, innaczej patch z dekoratora się nie wykona
+@patch.object(Twitter, 'get_user_avatar', return_value='test')
+def test_tweet_with_username(avatar_mock, twitter):
     if not twitter.username:
         pytest.skip()
 
     twitter.tweet('Test message')
-    assert twitter.tweets == [{'message': 'Test message', 'avatar': 'test'}]
+    assert twitter.tweets == [{'message': 'Test message', 'avatar': 'test', 'hashtags': []}]
+    avatar_mock.assert_called()
+
+
+@patch.object(requests, 'get', return_value=ResponseGetMock())
+def test_tweet_with_username2(avatar_mock, twitter):
+    if not twitter.username:
+        pytest.skip()
+
+    twitter.tweet('Test message')
+    assert twitter.tweets == [{'message': 'Test message', 'avatar': 'test', 'hashtags': []}]
+    avatar_mock.assert_called()
+
+
+@patch.object(requests, 'get', return_value=ResponseGetMock())
+def test_tweet_with_hashtag_mock(avatar_mock, twitter):
+    twitter.find_hashtags = Mock()
+    twitter.find_hashtags.return_value = ['first']
+    twitter.tweet('Test #second')
+    assert twitter.tweets[0]['hashtags'] == ['first']
+    twitter.find_hashtags.assert_called()
+    twitter.find_hashtags.assert_called_with('Test #second')
+
+
+def test_twitter_version(twitter):
+    twitter.version = MagicMock()
+    twitter.version.__eq__.return_value = '2.0'
+    assert twitter.version == '2.0'
+
+
+
+
+
+
+
+
+
+
