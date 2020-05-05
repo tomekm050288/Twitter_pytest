@@ -32,6 +32,8 @@ class Twitter:
         if not self.username:
             return None
         url = urljoin(USERS_API, self.username)
+        # import pdb; pdb.set_trace()
+        #import wdb; wdb.set_trace()
         resp = requests.get(url)
         return resp.json()["avatar_url"]
 
